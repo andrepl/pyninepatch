@@ -4,7 +4,7 @@ pyninepatch is a python library and command line tool for rendering android-styl
 
 ## EXAMPLES
 
-### Render a 9-patch to a specific size and display in on screen
+### Render a 9-patch to a specific size and display it on screen
 
 #### CLI
 
