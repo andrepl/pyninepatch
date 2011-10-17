@@ -7,7 +7,7 @@ pyninepatch requires the Python Imaging Library (http://pypi.python.org/pypi/PIL
 
 ## KNOWN ISSUES
 
-Doesn't support 9-patch images with non contiguous markings. (ie. only 1 stretchable and one content region allowed)
+images with multiple stretchable areas may end up rendering one or two pixels short due to rounding errors.
 
 
 ## EXAMPLES
