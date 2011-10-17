@@ -7,9 +7,9 @@ pyninepatch requires the Python Imaging Library (http://pypi.python.org/pypi/PIL
 
 ## KNOWN ISSUES
 
-images with multiple stretchable areas may end up rendering one or two pixels short due to rounding errors.
-
-
+- images with multiple stretchable areas may end up rendering one or two pixels short due to rounding errors.
+- it's not super efficient.
+ 
 ## EXAMPLES
 
 ### Render a 9-patch to a specific size and display it on screen
