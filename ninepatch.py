@@ -1,134 +1,255 @@
-import re
-import os, sys
+#!/usr/bin/env python
 import Image
+import math
 
 
+class Slice(object):
+    """
+    represents one section of a 9-patch image.
+    
+    """
+    total_width = 0
+    total_height = 0
+    def __init__(self, im, x, y, w, h, stretch_x, stretch_y):
+        self.x = x
+        self.y = y
+        self.w = w
+        self.h = h
+        self.im = im
+        self.stretch_x = stretch_x
+        self.stretch_y = stretch_y
+        
+    def set_total_width(self, width):
+        self.total_width = width
+        self.x_weight = self.w / float(self.total_width)
+        
+    def set_total_height(self, height):
+        self.total_height = height
+        self.y_weight = self.h / float(self.total_height)
+        
+    def __repr__(self):
+        return u"<Slice (%s, %s) %sx%s%s%s>" % (self.x, self.y, self.w, self.h, ", Stretch-X" if self.stretch_x else "", ", Stretch-Y" if self.stretch_y else "")
+    
+    def __str__(self):
+        return repr(self)
+    
+    def __unicode__(self):
+        return repr(self)
+    
+    
 class NinePatch(object):
+    """
+    a 9-Patch image.
     
-    def __init__(self, filename):
-        self.filename = filename
-        self.image = Image.open(filename)
-        self.pix = self.image.load()
-        self.scan_border()
-        
-        
-    def scan_border(self):        
-        ## Scan top and left borders to determine slices.
-        horiz = []
-        vert = []
-        for x in xrange(self.image.size[0]):
-            marked = self.pix[x,0][3] != 0
-            if not horiz and marked:
-                horiz.append(x-1)
-            elif horiz and not marked:
-                horiz.append(x-1)
-        for y in xrange(self.image.size[1]):
-            marked = self.pix[0,y][3] != 0
-            if not vert and marked:
-                vert.append(y-1)
-            elif vert and not marked:
-                vert.append(y-1)
-        
-        self.horiz = horiz
-        self.vert = vert
-        
-        self.top_left = self.image.crop((1,1,horiz[0],vert[0]))
-        self.top_center = self.image.crop((horiz[0], 1, horiz[1], vert[0]))
-        self.top_right = self.image.crop((horiz[1], 1, self.image.size[0]-2, vert[0]))
-        
-        self.center_left = self.image.crop((1,vert[0], horiz[0], vert[1]))
-        self.center = self.image.crop((horiz[0],vert[0], horiz[1], vert[1]))
-        self.center_right = self.image.crop((horiz[1], vert[0], self.image.size[0]-2, vert[1]))
-        
-        self.bottom_left = self.image.crop((1, vert[1], horiz[0], self.image.size[1]-2))
-        self.bottom_center = self.image.crop((horiz[0], vert[1], horiz[1], self.image.size[1]-2))
-        self.bottom_right = self.image.crop((horiz[1], vert[1], self.image.size[0]-2, self.image.size[1]-2))
-        
-        ## Scan right and bottom edges to determine content padding.
-        self.pad_top = 0
-        self.pad_left = 0
-        self.pad_right = 0
-        self.pad_bottom = 0
-        for x in xrange(self.image.size[0]):
-            marked = self.pix[x,self.image.size[1]-1][3] != 0
-            if not self.pad_left and marked:
-                self.pad_left = x-2
-            elif self.pad_left and (not marked) and (not self.pad_right):
-                self.pad_right = (self.image.size[0]-1) - (x-1)
+    
+    """
+
+    image = None
+    
+    def __init__(self, src_im):
+        if isinstance(src_im, Image.Image):
+            self.image = image
+        else:
+            self.image = Image.open(src_im)
             
-        for y in xrange(self.image.size[1]):
-            marked = self.pix[self.image.size[0]-1,y][3] != 0
-            if not self.pad_top and marked:
-                self.pad_top = y-2
-            elif self.pad_top and (not marked) and (not self.pad_bottom):
-                self.pad_bottom = (self.image.size[1]-1) - (y-1)
-           
+        self._check_image()
+        self._slice()
         
+    
+    def _check_image(self):
+        x_stretch_regions = []
+        y_stretch_regions = []
+        
+        x_content_region = None
+        y_content_region = None
+        
+        max_x = self.image.size[0] - 1
+        max_y = self.image.size[1] - 1
+        
+        x_region = None
+        y_region = None
+        
+        pix = self.image.load() # get a pixel access object.
+        
+        for x in xrange(max_x):
+            stretch = pix[x+1, 0][3] != 0
+            contentarea = pix[x+1, max_y][3] != 0
+            
+            # Check for stretchable region
+            if x_region is None and stretch:
+                x_region = x
+            elif isinstance(x_region, int) and not stretch:
+                x_stretch_regions.append((x_region, x-1))
+                x_region = None
+        
+            # Check for content region.
+            if x_content_region is None and contentarea:
+                x_content_region = x
+                
+            elif isinstance(x_content_region, int) and not contentarea:
+                x_content_region = (x_content_region, x-1)
+                
+            
+        if x_content_region is None:
+            x_content_region = (0,max_x-1)
+            
+        
+        for y in xrange(max_y):
+            stretch = pix[0, y+1][3] != 0
+            contentarea = pix[max_x, y+1][3] != 0
+            
+            # Check for stretchable region
+            if y_region is None and stretch:
+                y_region = y
+            elif isinstance(y_region, int) and not stretch:
+                y_stretch_regions.append((y_region, y-1))
+                y_region = None
+                
+            # Check for content region.
+            if y_content_region is None and contentarea:
+                y_content_region = y
+                
+            elif isinstance(y_content_region, int) and not contentarea:
+                y_content_region = (y_content_region, y-1)
+                
+            
+        if y_content_region is None:
+            y_content_region = (0,max_y-1)
+        
+        self.x_stretch_regions = x_stretch_regions
+        self.y_stretch_regions = y_stretch_regions
+        self.x_content_region = x_content_region
+        self.y_content_region = y_content_region
+
+        self.pad_left = x_content_region[0]
+        self.pad_right = self.image.size[0] - x_content_region[1]
+        self.pad_top = y_content_region[0]
+        self.pad_bottom = self.image.size[1] - y_content_region[1]
+        
+        # Remove borders.
+        self.image = self.image.crop((1,1,max_x-1, max_y-1))
+        self.min_width = self.image.size[0] - sum([a[1] - a[0] for a in self.x_stretch_regions])
+        self.min_height = self.image.size[1] - sum([a[1] - a[0] for a in self.y_stretch_regions])
+        
+    def _slice(self):
+        xpieces = []
+        ypieces = []
+        
+        for i, xsr in enumerate(self.x_stretch_regions):
+            if i == 0:
+                xpieces.append((0,xsr[0]-1))
+            else:
+                xpieces.append((self.x_stretch_regions[i-1][1]+1, xsr[0]-1))
+            xpieces.append(xsr)
+        xpieces.append((self.x_stretch_regions[-1][1]+1, self.image.size[0]-1))
+        
+        for i, ysr in enumerate(self.y_stretch_regions):
+            if i == 0:
+                ypieces.append((0,ysr[0]-1))
+            else:
+                ypieces.append((self.y_stretch_regions[i-1][1]+1, ysr[0]-1))
+            ypieces.append(ysr)
+        ypieces.append((self.y_stretch_regions[-1][1]+1, self.image.size[1]-1))
+        
+    
+        gridrows = []
+        
+        for y,yslice in enumerate(ypieces):
+            row = []
+            stretch_y = (y % 2 != 0)
+            
+            for x,xslice in enumerate(xpieces):
+                stretch_x = (x % 2 != 0)
+                box = (xslice[0], yslice[0], xslice[1], yslice[1])
+                im = self.image.crop(box)
+                piece = Slice(im, box[0], box[1], im.size[0], im.size[1], stretch_x, stretch_y)
+                row.append(piece)
+                
+            # Calculate horizontal weights
+            htotal = sum([p.w for p in row if p.stretch_x])
+            for p in row:
+                if p.stretch_x:
+                    p.set_total_width(htotal)
+            gridrows.append(row)
+            
+        # Calculate Vertical Weights
+        vtotal = sum([gridrows[y][0].h for y in xrange(len(gridrows)) if gridrows[y][0].stretch_y])
+        for row in gridrows:
+            for s in row:
+                if s.stretch_y:
+                    s.set_total_height(vtotal)
+                    
+        self.slices = gridrows
+        
+        
+                
     def render(self, size):
-        x_stretch = size[0] - (self.top_left.size[0] + self.top_right.size[0])
-        y_stretch = size[1] - (self.top_left.size[1] + self.bottom_left.size[1])
-        im = Image.new("RGBA", size, (0,0,0,0))
-        #top left
-        im.paste(self.top_left,(0,0))
-        #top center
-        tc = self.top_center.resize((x_stretch, self.top_center.size[1]))
-        im.paste(tc, (self.top_left.size[0], 0))
+        W, H = size
+        if W < self.min_width: W = self.min_width
+        if H < self.min_height: H = self.min_height
         
-        #top right
-        im.paste(self.top_right, (self.top_left.size[0] + x_stretch -1, 0))
+        stretchable_width = W - self.min_width
+        stretchable_height = H - self.min_height
         
-        #center left
-        cl = self.center_left.resize((self.top_left.size[0],y_stretch))
-        im.paste(cl, (0,self.top_left.size[1]))
         
-        #center center
-        cc = self.center.resize((x_stretch, y_stretch))
-        im.paste(cc, (self.top_left.size[0], self.top_left.size[1]))
+        new_im = Image.new("RGBA", (W, H), (0,0,0,0))
         
-        #center right
-        cr = self.center_right.resize((self.top_right.size[0], y_stretch))
-        im.paste(cr, (self.top_left.size[0] + x_stretch -1, 
-                      self.top_left.size[1]-1))
+        y = 0
+        for row in self.slices:
+            x = 0
+            if row[0].stretch_y:
+                height = int(row[0].y_weight * stretchable_height)
+            else:
+                height = row[0].h
+            
+            for s in row:
+                if s.stretch_x:
+                    width = int(s.x_weight * stretchable_width)
+                else:
+                    width = s.w
+                new_im.paste(s.im.resize((width, height), Image.NEAREST), (x,y))
+                x += width
+                
+            y += height
+        return new_im
+            
+                
+            
+    def render_around(self, content_image):
+        if not isinstance(content_image, Image.Image):
+            content_image = Image.open(content_image)
+            
+        cw = content_image.size[0]
+        ch = content_image.size[1]
+        cminw = self.x_content_region[1] - self.x_content_region[0]
+        cminh = self.y_content_region[1] - self.y_content_region[0]
         
-        #bottom left
-        im.paste(self.bottom_left, 
-                 (0, self.top_left.size[1] + y_stretch - 1))
+        if cw < cminw:
+            pad_left = self.pad_left + (cminw - cw) / 2
+            pad_right = self.pad_right + (cminw - cw) / 2
+            
+        else:
+            pad_left = self.pad_left
+            pad_right = self.pad_right
+            
+        if ch < cminh:
+            pad_top = self.pad_top + (cminh - ch) / 2
+            pad_bottom = self.pad_bottom + (cminh - ch) / 2
+            
+        else:
+            pad_top = self.pad_top
+            pad_bottom = self.pad_bottom
+            
+        imw = pad_left + pad_right + cw
+        imh = pad_top + pad_bottom + ch
         
-        #bottom center
-        bc = self.bottom_center.resize((x_stretch, self.bottom_center.size[1]))
-        im.paste(bc, (self.top_left.size[0]-1,
-                      self.top_left.size[1] + y_stretch -1))
-        
-        #bottom right
-        im.paste(self.bottom_right, (self.top_left.size[0] + x_stretch - 1,
-                                     self.top_left.size[1] + y_stretch -1))
+        im = self.render((imw, imh))
+        im.paste(content_image, (pad_left, pad_top), content_image)
         return im
-        
-        
-    def render_around(self, image):
-        
-        minwidth = self.top_left.size[0] + self.top_right.size[0]
-        minheight = self.top_left.size[1] + self.bottom_left.size[1]
-        w = image.size[0] + self.pad_left + self.pad_right
-        h = image.size[1] + self.pad_top + self.pad_bottom        
-        pad_left = self.pad_left
-        pad_top = self.pad_top
-        pad_right = self.pad_right
-        pad_bottom = self.pad_bottom
-        
-        if w < minwidth: 
-            pad_left += (minwidth - w) / 2
-            pad_right += (minwidth - w) / 2
-            w = minwidth
-        if h < minheight:
-            pad_top += (minheight - h) / 2
-            pad_bottom += (minheight -h) /2 
-            h = minheight
-        bg = self.render((w,h))
-        bg.paste(image, (pad_left, pad_top))
-        return bg
     
-    
+            
+        
+
         
 def parse_size(sizeS):
     return tuple(map(int, re.split("x", sizeS, re.I)))
@@ -166,9 +287,3 @@ if __name__ == "__main__":
         result.show()
         
         
-    
-    
-    
-    
-    
-    
