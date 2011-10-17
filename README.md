@@ -1,6 +1,11 @@
 # README
 
 pyninepatch is a python library and command line tool for rendering android-style 9-patch images.
+(see: http://developer.android.com/guide/topics/graphics/2d-graphics.html)
+
+pyninepatch requires the Python Imaging Library (http://pypi.python.org/pypi/PIL/).
+
+
 
 ## EXAMPLES
 
