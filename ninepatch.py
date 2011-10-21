@@ -184,6 +184,12 @@ class NinePatch(object):
         
                 
     def render(self, size):
+        """
+        Render the 9-patch to a specified size.
+        
+        Return a new Image object.
+        
+        """
         W, H = size
         if W < self.min_width: W = self.min_width
         if H < self.min_height: H = self.min_height
@@ -216,6 +222,13 @@ class NinePatch(object):
                 
             
     def render_around(self, content_image):
+        """
+        Render a 9-patch around another Image
+        
+        Return a new Image with the content_image rendered within the
+        content area of the 9-patch.
+        
+        """
         if not isinstance(content_image, Image.Image):
             content_image = Image.open(content_image)
             
