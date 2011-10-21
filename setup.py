@@ -24,7 +24,7 @@ setup(name='ninepatch',
     py_modules=['ninepatch'],
     entry_points={
         "console_scripts": [
-            'myexecutable = ninepatch:main',
+            'ninepatch = ninepatch:main',
         ],
     }
 )
