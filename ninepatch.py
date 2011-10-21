@@ -253,8 +253,9 @@ class NinePatch(object):
         
 def parse_size(sizeS):
     return tuple(map(int, re.split("x", sizeS, re.I)))
-                    
-if __name__ == "__main__":
+    
+    
+def main():  
     import sys
     import optparse
     parser = optparse.OptionParser()
@@ -286,4 +287,7 @@ if __name__ == "__main__":
     else:
         result.show()
         
-        
+
+if __name__ == "__main__":
+    main()
+            
