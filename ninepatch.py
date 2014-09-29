@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import Image
 import math
-
+import re
 
 class Slice(object):
     """
